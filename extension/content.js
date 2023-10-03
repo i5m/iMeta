@@ -1,6 +1,7 @@
 // This is the content script that will be injected into web pages
 
 console.log('Script loaded');
+let search_history = [];
 
 
 async function async_fetcher(method, url, data) {
@@ -31,7 +32,7 @@ async function async_fetcher(method, url, data) {
 
 function processImageForm() {
 
-    const ele = iMetaImageFile = document.getElementById("iMetaImageFile");
+    const ele = document.getElementById("iMetaImageFile");
 
     const formData = new FormData();
     
@@ -49,6 +50,48 @@ function processImageForm() {
 
 }
 
+
+function processFollowUpQues() {
+
+    const followUpQuesInp = document.getElementById("followUpQuesInp");
+
+    if (followUpQuesInp.value == '') {
+        return;
+    }
+
+    const hstr = search_history.join(',')
+
+    const formData = new FormData();
+    formData.append("q", followUpQuesInp.value);
+    formData.append("history", hstr);
+    
+    const resDiv = document.createElement("div");
+    resDiv.setAttribute("class", "m-2 p-2");
+    resDiv.innerHTML = `<div class="spinner-grow text-primary" role="status"></div>`;
+    
+    async_fetcher("POST", "/mind-map", formData).then(resp => {
+        
+        if (resp.data == false ) {
+            return;
+        }
+
+        search_history.push(resp.data.keyword);
+
+        const usefulResp = resp.data.content.split('</abc>');
+        console.log(usefulResp);
+        let ansStr = '';
+
+        for (var i = 0; i < usefulResp.length; i++) {
+            ansStr += `<div class="border rounded-3 m-2 p-2 small d-inline-block text-wrap text-break">${usefulResp[i]}</div>`;
+        }
+
+        resDiv.innerHTML = ansStr;
+
+    });
+
+    followUpQuesInp.parentElement.appendChild(resDiv);
+
+}
 
 
 function metaphorChecker() {
@@ -100,9 +143,16 @@ function metaphorChecker() {
             iMetaResult.parentElement.removeChild(iMetaResult);
         }
 
+        search_history.push(resp.data.keyword);
+
         let final_str = ``;
 
         final_str += `<h3 class="fw-bold">${resp.data.keyword}</h3><br/><br/>`;
+
+        final_str += `<div>
+            <input id="followUpQuesInp" class="form-control" placeholder="Ask a follow up..." />
+            <button id="followUpBtn" class="btn btn-sm btn-outline-primary rounded-pill m-2">Ask!</button><br/>
+        </div>`
 
         for (var i = 0; i < resp.data.images.length; i++) {
             final_str += `<img src="${resp.data.images[i]}" style="max-width:200px" height="auto" class="img-thumbnail rounded-3 m-auto p-1 border d-inline-block" />`
@@ -116,6 +166,9 @@ function metaphorChecker() {
 
         iMetaResult.innerHTML = final_str;
 
+        const followUpBtn = document.getElementById("followUpBtn");
+        followUpBtn.addEventListener("click", processFollowUpQues);
+    
     });
 
     PageWrapper.appendChild(iMetaResult);
